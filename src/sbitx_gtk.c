@@ -801,17 +801,19 @@ static int tx_mode = MODE_USB;
 
 #define BAND80M 0
 #define BAND60M 1
-#define BAND40M 2
-#define BAND30M 3
-#define BAND20M 4
-#define BAND17M 5
-#define BAND15M 6
-#define BAND12M 7
-#define BAND10M 8
+#define BANDISM68 2
+#define BAND40M 3
+#define BAND30M 4
+#define BAND20M 5
+#define BAND17M 6
+#define BAND15M 7
+#define BAND12M 8
+#define BAND10M 9
 
 struct band band_stack[] = {
 	{"80M", 3500000, 4000000, 0, {3500000, 3574000, 3600000, 3700000}, {MODE_CW, MODE_LSB, MODE_CW, MODE_LSB}, 50, 50},
 	{"60M", 5250000, 5500000, 0, {5251500, 5354000, 5357000, 5360000}, {MODE_CW, MODE_USB, MODE_USB, MODE_USB}, 50, 50},
+        {"ISM68", 6765000, 6795000, 0, {6765000, 6780000, 6787700, 6793500}, {MODE_USB, MODE_USB, MODE_USB, MODE_USB}, 50, 50},
 	{"40M", 7000000, 7300000, 0, {7000000, 7040000, 7074000, 7150000}, {MODE_CW, MODE_CW, MODE_USB, MODE_LSB}, 50, 50},
 	{"30M", 10100000, 10150000, 0, {10100000, 10100000, 10136000, 10150000}, {MODE_CW, MODE_CW, MODE_USB, MODE_USB}, 50, 50},
 	{"20M", 14000000, 14400000, 0, {14010000, 14040000, 14074000, 14200000}, {MODE_CW, MODE_CW, MODE_USB, MODE_USB}, 50, 50},
@@ -947,7 +949,7 @@ struct field main_controls[] = {
 	{"r1:mode", do_mode_dropdown, 5, 5, 40, 40, "MODE", 40, "USB", FIELD_DROPDOWN, STYLE_FIELD_VALUE,
 	 "USB/LSB/AM/FM/CW/CWR/FT8/FT4/DIGI/2TONE", 0, 0, 0, COMMON_CONTROL},
 	{"#band", do_band_dropdown, 45, 5, 40, 40, "80M", 40, "=---", FIELD_DROPDOWN, STYLE_FIELD_VALUE,
-	 "80M/60M/40M/30M/20M/17M/15M/12M/10M", 0, 0, 0, COMMON_CONTROL},
+	 "80M/60M/ISM68/40M/30M/20M/17M/15M/12M/10M", 0, 0, 0, COMMON_CONTROL},
 	{"#band_stack_pos", do_band_stack_position, 85, 5, 45, 40, "", 1, "USB\n14200", FIELD_DROPDOWN, STYLE_FIELD_VALUE,
 	 "USB 14200/CW 14010/CW 14040/USB 14074", 0, 0, 0, COMMON_CONTROL},
 
@@ -2776,6 +2778,8 @@ static int user_settings_handler(void *user, const char *section,
 		band = BAND80M;
 	else if (!strcmp(section, "60M"))
 		band = BAND60M;
+	else if (!strcmp(section, "ISM68"))
+		band = BANDISM68;
 	else if (!strcmp(section, "40M"))
 		band = BAND40M;
 	else if (!strcmp(section, "30M"))
@@ -11160,6 +11164,7 @@ void do_control_action(char *cmd)
 	}
 	else if (!strcmp(request, "80M") ||
 			 !strcmp(request, "60M") ||
+			 !strcmp(request, "ISM68") ||
 			 !strcmp(request, "40M") ||
 			 !strcmp(request, "30M") ||
 			 !strcmp(request, "20M") ||
