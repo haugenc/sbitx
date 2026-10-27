@@ -90,7 +90,7 @@ static char dump_state_response[] =
         /* Bit field list of set functions */
         "0\n" /* RIG_FUNC_NONE */
         /* Bit field list of get level */
-        "0x40000020\n" /* RIG_LEVEL_SQL | RIG_LEVEL_STRENGTH */
+        "0x8070001020\n" /* SQL | RFPOWER | SWR | ALC | STRENGTH | RFPOWER_METER_WATTS */
         /* Bit field list of set level */
         "0x20\n"       /* RIG_LEVEL_SQL */
         /* Bit field list of get parm */
@@ -131,6 +131,21 @@ int check_cmd(char *cmd, char *token){
     return 1;
   else
     return 0;
+}
+struct rx;
+extern struct rx *rx_list;
+extern int get_rx_gain(void);
+extern int calculate_s_meter(struct rx *r, double rx_gain);
+extern int fwdpower, vswr;
+extern float alc_level;
+
+/* Exact token match: cmd must equal token, or token followed by space/CR.
+   Prevents "l RFPOWER" from matching "l RFPOWER_METER_WATTS". */
+int check_cmd_exact(char *cmd, char *token){
+  size_t n = strlen(token);
+  if (strncmp(cmd, token, n) != 0)
+    return 0;
+  return cmd[n] == '\0' || cmd[n] == ' ' || cmd[n] == '\r';
 }
 
 #define MAX_DATA 1000
@@ -213,9 +228,39 @@ void set_mode(int client_socket, char* f) {
     send_response(client_socket, "RPRT -9\n");
 }
 void send_rfpower(int client_socket) {
-    char resp[3];
+    char resp[16];
     float drive = (float)field_int("DRIVE") / (float)100;
-    snprintf(resp, sizeof(resp), "%f\n", drive);
+    snprintf(resp, sizeof(resp), "%.2f\n", drive);
+    send_response(client_socket, resp);
+}
+/* Hamlib STRENGTH: integer dB relative to S9 (S9 = 0, 6 dB per S-unit).
+   Reuses the on-screen meter; calculate_s_meter() returns s_units*100 + extra_db. */
+void send_strength(int client_socket) {
+    char resp[16];
+    int v = calculate_s_meter(rx_list, (double)get_rx_gain());
+    int s_units  = v / 100;
+    int extra_db = v % 100;
+    int s9_rel = (s_units - 9) * 6 + extra_db;
+    snprintf(resp, sizeof(resp), "%d\n", s9_rel);
+    send_response(client_socket, resp);
+}
+void send_swr(int client_socket) {
+    char resp[16];
+    snprintf(resp, sizeof(resp), "%.1f\n", vswr / 10.0);
+    send_response(client_socket, resp);
+}
+
+void send_alc(int client_socket) {
+    char resp[16];
+    float a = 1.0f - alc_level;            /* 0 = no limiting, rises with ALC action */
+    if (a < 0.0f) a = 0.0f;
+    if (a > 1.0f) a = 1.0f;
+    snprintf(resp, sizeof(resp), "%.2f\n", a);
+    send_response(client_socket, resp);
+}
+void send_fwd_watts(int client_socket) {
+    char resp[16];
+    snprintf(resp, sizeof(resp), "%.1f\n", fwdpower / 10.0);
     send_response(client_socket, resp);
 }
 void get_vfo(int client_socket) {
@@ -341,9 +386,17 @@ void interpret_command(int client_socket, char* cmd) {
     }
     else if (check_cmd(cmd, "u TUNER"))
         send_response(client_socket, "0\n");
-  else if (check_cmd(cmd, "l RFPOWER")) {
+    else if (check_cmd_exact(cmd, "l STRENGTH")) 
+        send_strength(client_socket);
+    else if (check_cmd_exact(cmd, "l RFPOWER")) 
         send_rfpower(client_socket);
-  }  else { 
+    else if (check_cmd_exact(cmd, "l SWR")) 
+        send_swr(client_socket);
+    else if (check_cmd_exact(cmd, "l ALC")) 
+        send_alc(client_socket);
+    else if (check_cmd_exact(cmd, "l RFPOWER_METER_WATTS")) 
+        send_fwd_watts(client_socket);
+    else { 
     printf("Hamlib: Unrecognized command [%s] '%c'\n", cmd, cmd[0]);
     //Send an unimplemented response error code
     send_response(client_socket, "RPRT -11\n");
